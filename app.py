@@ -1,6 +1,14 @@
 import streamlit as st
 from orchestrator_module import orchestrate  # we'll fill this later
 
+# app.py
+import streamlit as st
+from orchestrator_module import load_or_build_vector_store, orchestrate
+
+# 🧭 Step 1: Load or build vector DB on startup
+load_or_build_vector_store()
+
+
 import os
 import streamlit as st
 import chromadb
@@ -80,6 +88,7 @@ if st.button("Submit") and query:
     st.subheader("📚 Sources")
     for s in result.get("sources", []):
         st.write(f"- {s}")
+
 
 
 
