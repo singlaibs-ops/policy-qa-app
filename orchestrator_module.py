@@ -33,7 +33,8 @@ _collection = None
 def _get_embedder():
     global _embedder
     if _embedder is None:
-        _embedder = SentenceTransformer(EMBED_MODEL_NAME)
+        # ✅ Force CPU usage to avoid NotImplementedError on Streamlit Cloud
+        _embedder = SentenceTransformer(EMBED_MODEL_NAME, device="cpu")
     return _embedder
 
 def _get_chroma_client():
@@ -182,4 +183,5 @@ def orchestrate(user_query: str) -> Dict:
         "chunks_used": chunks,
         "answer": answer
     }
+
 
