@@ -8,7 +8,7 @@ from sentence_transformers import SentenceTransformer
 from PyPDF2 import PdfReader
 
 # Embedding model and Chroma DB setup
-embedder = SentenceTransformer("all-mpnet-base-v2")
+embedder = SentenceTransformer("all-MiniLM-L6-v2")
 chroma_client = chromadb.PersistentClient(path="./vector_db")
 collection = chroma_client.get_or_create_collection("policy_docs")
 
@@ -80,5 +80,6 @@ if st.button("Submit") and query:
     st.subheader("📚 Sources")
     for s in result.get("sources", []):
         st.write(f"- {s}")
+
 
 
