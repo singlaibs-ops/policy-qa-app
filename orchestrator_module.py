@@ -8,7 +8,7 @@ api_key = os.environ["GROQ_API_KEY"]
 client = Groq(api_key=api_key)
 
 # ✅ Load embedding model and Chroma vector DB
-embedder = SentenceTransformer("all-mpnet-base-v2")
+embedder = SentenceTransformer("all-MiniLM-L6-v2")
 chroma_client = chromadb.PersistentClient(path="./vector_db")
 collection = chroma_client.get_or_create_collection("policy_docs")
 
@@ -69,5 +69,6 @@ Answer:
             "answer": f"⚠️ Error: {e}",
             "sources": []
         }
+
 
 
