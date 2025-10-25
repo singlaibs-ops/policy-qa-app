@@ -75,11 +75,12 @@ if st.button("Submit") and query:
     st.write("Q&A Agent")
 
     st.subheader("📄 Answer")
-   st.write(result)
-
+    st.write(result)
+    
     st.subheader("📚 Sources")
     for s in result.get("sources", []):
         st.write(f"- {s}")
+
 
 
 
