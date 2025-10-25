@@ -72,14 +72,15 @@ if st.button("Submit") and query:
         result = orchestrate(query)
 
     st.subheader("🧭 Agent Used")
-    st.write(result.get("agent_used", "N/A"))
+    st.write("Q&A Agent")
 
     st.subheader("📄 Answer")
-    st.write(result.get("answer", "No answer returned."))
+   st.write(result)
 
     st.subheader("📚 Sources")
     for s in result.get("sources", []):
         st.write(f"- {s}")
+
 
 
 
