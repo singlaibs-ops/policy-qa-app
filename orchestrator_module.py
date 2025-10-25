@@ -99,18 +99,30 @@ def _add_to_collection(chunks: List[str], source_name: str, collection):
 
 def _ingest_file(path: str, collection):
     filename = os.path.basename(path)
+
     if _already_ingested(filename, collection):
-        return  # Skip duplicates
+        print(f"⏩ Skipping already ingested file: {filename}")
+        return
 
-    text = ""
-    if filename.lower().endswith(".pdf"):
-        text = _read_pdf(path)
-    elif filename.lower().endswith(".txt"):
-        text = _read_txt(path)
+    try:
+        if filename.lower().endswith(".pdf"):
+            text = _read_pdf(path)
+        elif filename.lower().endswith(".txt"):
+            text = _read_txt(path)
+        else:
+            print(f"⚠️ Skipping unsupported file format: {filename}")
+            return
 
-    if text.strip():
-        chunks = _split_text(text)
-        _add_to_collection(chunks, filename, collection)
+        if text.strip():
+            chunks = _split_text(text)
+            _add_to_collection(chunks, filename, collection)
+            print(f"✅ Ingested file: {filename} ({len(chunks)} chunks)")
+        else:
+            print(f"⚠️ No readable text in {filename}")
+
+    except Exception as e:
+        print(f"❌ Failed to process {filename}: {e}")
+
 
 # ----------------------------
 # 🧠 Vector DB Load or Build
@@ -170,3 +182,4 @@ def orchestrate(user_query: str) -> Dict:
         "chunks_used": chunks,
         "answer": answer
     }
+
