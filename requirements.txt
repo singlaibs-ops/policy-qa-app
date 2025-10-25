@@ -5,3 +5,4 @@ pypdf
 docx2txt
 langchain-text-splitters
 groq
+PyPDF2
