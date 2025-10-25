@@ -116,4 +116,10 @@ Answer:
 
 
 
+def ingest_policies():
+    print("🚀 Running ingestion at startup...")
+    pdf_files = glob.glob(os.path.join(DOCS_DIR, "*.pdf"))
+    print(f"Found PDF files: {pdf_files}")  # 👈 this will show what it found
+
+
 
