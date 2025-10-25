@@ -12,6 +12,17 @@ embedder = SentenceTransformer("all-mpnet-base-v2")
 chroma_client = chromadb.PersistentClient(path="./vector_db")
 collection = chroma_client.get_or_create_collection("policy_docs")
 
+# --- Debug/Status: show vector DB count in the UI ---
+try:
+    doc_count = collection.count()
+except Exception:
+    doc_count = "unknown"
+
+with st.sidebar:
+    st.markdown("### 🧰 Vector DB status")
+    st.write(f"Records stored: {doc_count}")
+    st.caption("Upload PDFs/TXT on this sidebar to add records.")
+
 def ingest_document(file):
     text = ""
     if file.name.endswith(".pdf"):
@@ -69,4 +80,5 @@ if st.button("Submit") and query:
     st.subheader("📚 Sources")
     for s in result.get("sources", []):
         st.write(f"- {s}")
+
 
