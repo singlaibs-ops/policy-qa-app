@@ -1,125 +1,96 @@
 import os
-import glob
 import chromadb
+from chromadb.utils import embedding_functions
 from sentence_transformers import SentenceTransformer
 from PyPDF2 import PdfReader
 
-# Persistent Chroma setup
+# ================================
+# 1. Load Embedding Model
+# ================================
+print("🚀 Loading embedding model...")
+embedder = SentenceTransformer("all-mpnet-base-v2")
+
+# ================================
+# 2. Initialize Chroma Vector DB
+# ================================
+print("🧠 Initializing Chroma DB...")
 chroma_client = chromadb.PersistentClient(path="./vector_db")
 collection = chroma_client.get_or_create_collection("policy_docs")
-embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
-# Folder containing your policy docs
-DOCS_DIR = "./docs"
-
-def ingest_policies():
-    existing = set(collection.get()["metadatas"])  # or keep filenames in metadata
-    pdf_files = glob.glob(os.path.join(DOCS_DIR, "*.pdf"))
-
-    for file_path in pdf_files:
-        filename = os.path.basename(file_path)
-        if filename in existing:
-            print(f"✅ Skipping already ingested: {filename}")
-            continue
-
-        print(f"📥 Ingesting {filename} ...")
-        text = extract_text_from_pdf(file_path)
-        chunks = chunk_text(text)
-        embeddings = embedder.encode(chunks).tolist()
-        collection.add(documents=chunks, embeddings=embeddings, metadatas=[filename]*len(chunks))
-
-def extract_text_from_pdf(file_path):
-    reader = PdfReader(file_path)
+# ================================
+# 3. Helper Function to Extract Text
+# ================================
+def extract_text_from_pdf(file_path: str) -> str:
+    """Extracts text from a PDF file using PyPDF2."""
     text = ""
-    for page in reader.pages:
-        text += page.extract_text() or ""
+    try:
+        reader = PdfReader(file_path)
+        for page in reader.pages:
+            text += page.extract_text() or ""
+    except Exception as e:
+        print(f"❌ Error reading {file_path}: {e}")
     return text
 
-def chunk_text(text, chunk_size=500):
-    return [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
+# ================================
+# 4. Ingest Documents from ./docs
+# ================================
+DOCS_DIR = "./docs"
 
-# ✅ Run ingestion once on startup
-ingest_policies()
+def ingest_documents():
+    """Loop through docs folder and add new documents to Chroma."""
+    existing_ids = set(collection.get()["ids"])
+    print(f"📂 Scanning folder: {DOCS_DIR}")
 
+    for filename in os.listdir(DOCS_DIR):
+        file_path = os.path.join(DOCS_DIR, filename)
+        file_id = filename  # can use hash for uniqueness if needed
 
-import os
-from groq import Groq
-import chromadb
-from sentence_transformers import SentenceTransformer
+        if file_id in existing_ids:
+            print(f"⏭️ Skipping already ingested: {filename}")
+            continue
 
-# ✅ Load API key from Streamlit Secrets (already added)
-api_key = os.environ["GROQ_API_KEY"]
-client = Groq(api_key=api_key)
+        if filename.lower().endswith(".pdf"):
+            print(f"📄 Ingesting: {filename}")
+            text = extract_text_from_pdf(file_path)
 
-# ✅ Load embedding model and Chroma vector DB
-embedder = SentenceTransformer("all-MiniLM-L6-v2")
-chroma_client = chromadb.PersistentClient(path="./vector_db")
-collection = chroma_client.get_or_create_collection("policy_docs")
+            if text.strip():
+                embedding = embedder.encode([text])[0].tolist()
+                collection.add(
+                    documents=[text],
+                    embeddings=[embedding],
+                    ids=[file_id]
+                )
+                print(f"✅ Ingested: {filename}")
+            else:
+                print(f"⚠️ No text found in: {filename}")
 
-def orchestrate(query: str):
-    try:
-        # Step 1: Encode the query to a vector
-        query_vector = embedder.encode([query])[0].tolist()
+    print("✅ Ingestion complete.")
 
-        # Step 2: Retrieve top matching chunks from Chroma DB
-        results = collection.query(
-            query_embeddings=[query_vector],
-            n_results=3,
-            include=["documents", "metadatas"]
-        )
-        retrieved_chunks = [doc for doc in results["documents"][0]]
+# Call ingestion once at startup
+ingest_documents()
 
-        if not retrieved_chunks:
-            return {
-                "agent_used": "Q&A Agent",
-                "answer": "No relevant information found in the ingested documents.",
-                "sources": []
-            }
+# ================================
+# 5. Orchestrate Query
+# ================================
+def orchestrate(query: str) -> str:
+    """Perform semantic search on ingested policy docs and return top answer."""
+    if not query or not query.strip():
+        return "⚠️ Please enter a valid question."
 
-        # Step 3: Construct prompt
-        context = "\n\n".join(retrieved_chunks)
-        prompt = f"""Answer the question strictly based on the policy context below.
-If no relevant information is found, say so clearly.
+    # Create embedding for query
+    query_vector = embedder.encode([query])[0].tolist()
 
-Context:
-{context}
+    # Search top matching chunks
+    results = collection.query(
+        query_embeddings=[query_vector],
+        n_results=3
+    )
 
-Question:
-{query}
+    if not results["documents"] or not results["documents"][0]:
+        return "❌ No relevant information found in the ingested documents."
 
-Answer:
-"""
+    # Combine top matches into a single answer
+    top_docs = results["documents"][0]
+    answer = "\n\n".join(top_docs)
 
-        # Step 4: Call Groq LLM
-        completion = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.2,
-        )
-
-        answer = completion.choices[0].message.content
-
-        # Step 5: Return the final answer with source documents
-        sources = [meta.get("source", "Unknown") for meta in results["metadatas"][0]]
-        return {
-            "agent_used": "Q&A Agent",
-            "answer": answer,
-            "sources": sources
-        }
-
-    except Exception as e:
-        return {
-            "agent_used": "Q&A Agent",
-            "answer": f"⚠️ Error: {e}",
-            "sources": []
-        }
-
-
-
-def ingest_policies():
-    print("🚀 Running ingestion at startup...")
-    pdf_files = glob.glob(os.path.join(DOCS_DIR, "*.pdf"))
-    print(f"Found PDF files: {pdf_files}")  # 👈 this will show what it found
-
-
-
+    return answer
