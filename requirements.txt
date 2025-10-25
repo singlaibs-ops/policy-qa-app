@@ -1,0 +1,7 @@
+streamlit
+chromadb
+sentence-transformers
+pypdf
+docx2txt
+langchain-text-splitters
+groq
