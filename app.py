@@ -1,6 +1,45 @@
 import streamlit as st
 from orchestrator_module import orchestrate  # we'll fill this later
 
+import os
+import streamlit as st
+import chromadb
+from sentence_transformers import SentenceTransformer
+from PyPDF2 import PdfReader
+
+# Embedding model and Chroma DB setup
+embedder = SentenceTransformer("all-mpnet-base-v2")
+chroma_client = chromadb.PersistentClient(path="./vector_db")
+collection = chroma_client.get_or_create_collection("policy_docs")
+
+def ingest_document(file):
+    text = ""
+    if file.name.endswith(".pdf"):
+        reader = PdfReader(file)
+        for page in reader.pages:
+            text += page.extract_text() or ""
+    else:
+        text = file.read().decode("utf-8", errors="ignore")
+
+    # Simple chunking into 1000-char segments
+    chunks = [text[i:i+1000] for i in range(0, len(text), 1000)]
+    embeddings = embedder.encode(chunks).tolist()
+
+    for i, chunk in enumerate(chunks):
+        collection.add(
+            documents=[chunk],
+            embeddings=[embeddings[i]],
+            metadatas=[{"source": file.name}],
+            ids=[f"{file.name}-{i}"]
+        )
+
+# 📥 Sidebar for uploading
+st.sidebar.subheader("📥 Upload Policy Document")
+uploaded_file = st.sidebar.file_uploader("Choose a PDF or TXT file")
+if uploaded_file is not None:
+    ingest_document(uploaded_file)
+    st.sidebar.success(f"✅ Document '{uploaded_file.name}' ingested successfully!")
+
 # --- Page Setup ---
 st.set_page_config(page_title="Policy Q&A Assistant", page_icon="📜")
 st.title("📜 Policy Q&A Assistant")
@@ -30,3 +69,4 @@ if st.button("Submit") and query:
     st.subheader("📚 Sources")
     for s in result.get("sources", []):
         st.write(f"- {s}")
+
